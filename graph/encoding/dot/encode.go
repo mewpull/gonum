@@ -11,9 +11,9 @@ import (
 	"sort"
 	"strings"
 
+	"bitbucket.org/zombiezen/cardcpx/natsort"
 	"gonum.org/v1/gonum/graph"
 	"gonum.org/v1/gonum/graph/encoding"
-	"gonum.org/v1/gonum/graph/internal/ordered"
 )
 
 // Node is a DOT graph node.
@@ -105,7 +105,7 @@ type edge struct {
 
 func (p *printer) print(g graph.Graph, name string, needsIndent, isSubgraph bool) error {
 	nodes := g.Nodes()
-	sortByDOTIDorID(nodes)
+	sort.Sort(byDOTIDorID(nodes))
 
 	p.buf.WriteString(p.prefix)
 	if needsIndent {
@@ -183,7 +183,7 @@ func (p *printer) print(g graph.Graph, name string, needsIndent, isSubgraph bool
 	havePrintedEdgeHeader := false
 	for _, n := range nodes {
 		to := g.From(n)
-		sortByDOTIDorID(to)
+		sort.Sort(byDOTIDorID(to))
 		for _, t := range to {
 			if isDirected {
 				if p.visited[edge{inGraph: name, from: n.ID(), to: t.ID()}] {
@@ -358,25 +358,21 @@ func (p *printer) closeBlock(b string) {
 	p.buf.WriteString(b)
 }
 
-// sortByDOTIDorID sorts the slice of nodes by DOT ID if present, and node ID
-// otherwise.
-func sortByDOTIDorID(nodes []graph.Node) {
-	dotIDs := true
-	for _, n := range nodes {
-		if _, ok := n.(Node); !ok {
-			dotIDs = false
-			break
-		}
+// byDOTIDorID implements the sort.Interface sorting a slice of graph.Node
+// by DOT ID if present and ID otherwise.
+type byDOTIDorID []graph.Node
+
+func (n byDOTIDorID) Len() int      { return len(n) }
+func (n byDOTIDorID) Swap(i, j int) { n[i], n[j] = n[j], n[i] }
+
+func (n byDOTIDorID) Less(i, j int) bool {
+	return natsort.Less(id(n[i]), id(n[j]))
+}
+
+// id returns the DOT ID of the given node if present, and the ID otherwise.
+func id(n graph.Node) string {
+	if n, ok := n.(Node); ok {
+		return n.DOTID()
 	}
-	if !dotIDs {
-		sort.Sort(ordered.ByID(nodes))
-		return
-	}
-	less := func(i, j int) bool {
-		a, b := nodes[i], nodes[j]
-		aa := a.(Node)
-		bb := b.(Node)
-		return aa.DOTID() < bb.DOTID()
-	}
-	sort.Slice(nodes, less)
+	return fmt.Sprint(n.ID())
 }
