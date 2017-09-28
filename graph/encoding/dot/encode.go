@@ -366,6 +366,12 @@ func (n byDOTIDorID) Len() int      { return len(n) }
 func (n byDOTIDorID) Swap(i, j int) { n[i], n[j] = n[j], n[i] }
 
 func (n byDOTIDorID) Less(i, j int) bool {
+	if isEntry(n[i]) {
+		return true
+	}
+	if isEntry(n[j]) {
+		return false
+	}
 	return natsort.Less(id(n[i]), id(n[j]))
 }
 
@@ -375,4 +381,16 @@ func id(n graph.Node) string {
 		return n.DOTID()
 	}
 	return fmt.Sprint(n.ID())
+}
+
+// isEntry reports whether the given node is the entry node of the graph.
+func isEntry(n graph.Node) bool {
+	if n, ok := n.(encoding.Attributer); ok {
+		for _, attr := range n.Attributes() {
+			if attr.Key == "label" && attr.Value == "entry" {
+				return true
+			}
+		}
+	}
+	return false
 }
